@@ -15,6 +15,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.impl.TextCodec;
 
 public class SSOClient {
+	/**
+	 * 测试开关，当开启测试模式时秘钥为默认值，不从redis取，也不缓存。
+	 */
+	public static boolean isTest=true;
+	public static String testSecretKey="123456789abc";
 	private static String clientSysId="";
 	private static String domain="";
 	
@@ -36,8 +41,11 @@ public class SSOClient {
 		SSOClient.clientSecretExpire=((long)clientSecretExpire)*1000L;
 		SSOClient.clientSysId = clientSysId;
 		SSOClient.domain = domain;
-		secretKeyMap = new ConcurrentHashMap<String,SecretKeyEntity>();
 		Log.show = isShowLog;
+		if(isTest) {
+			return;
+		}
+		secretKeyMap = new ConcurrentHashMap<String,SecretKeyEntity>();
 		new Thread(new StorageManage(secretKeyMap)).start();
 	}
 	/**
@@ -62,8 +70,10 @@ public class SSOClient {
     		secretKey = String.valueOf(System.currentTimeMillis());
     		JedisUtil.saveSecretKey(username, secretKey);
 	    }
-    	SecretKeyEntity ske = new SecretKeyEntity(secretKey,clientSecretExpire);
-		secretKeyMap.put(username, ske);
+    	if(!isTest) {
+    		SecretKeyEntity ske = new SecretKeyEntity(secretKey,clientSecretExpire);
+    		secretKeyMap.put(username, ske);
+    	}
 		String token = JwtHelper.createJWT(username,"1",remark,clientSysId,secretKey);
 	    //保存token到cookie中
         Cookie cookie = new Cookie("g_token", token);
@@ -95,14 +105,21 @@ public class SSOClient {
 		if(!verify(token)) {
 			return;
 		}
-		TokenBody tokenbody = transToTokenBody(token);
-		secretKeyMap.remove(tokenbody.getUsername());
+		if(!isTest) {
+			TokenBody tokenbody = getTokenBody(token);
+			secretKeyMap.remove(tokenbody.getUsername());
+		}
 		//保存token到cookie中
         Cookie cookie = new Cookie("g_token", "");
 		cookie.setPath("/");
 		cookie.setDomain(domain);
 		response.addCookie(cookie);
 	}
+	/**
+	 * 
+	 * @param request
+	 * @return
+	 */
 	public static String getToken(HttpServletRequest request) {
 		Cookie[] cookies = request.getCookies();  
         if (null==cookies) {  
@@ -125,12 +142,15 @@ public class SSOClient {
 	public static void logoutAll(HttpServletRequest request,HttpServletResponse response) {
 		logout(request,response);
 		//清理服务器端的秘钥.
-		JedisUtil.removeKey(transToTokenBody(getToken(request)).getUsername());
+		JedisUtil.removeKey(getTokenBody(getToken(request)).getUsername());
 	}
 	
 	private static String getSecretKey(String token) {
+		if(isTest) {
+			return testSecretKey;
+		}
 		String username=null;
-		TokenBody tokenBody=transToTokenBody(token);
+		TokenBody tokenBody=getTokenBody(token);
 		if(tokenBody==null) {
 			return null;
 		}
@@ -162,8 +182,12 @@ public class SSOClient {
 	    	}
 	    }
 	}
-
-	private static TokenBody transToTokenBody(String token) {
+	/**
+	 * 
+	 * @param token
+	 * @return
+	 */
+	public static TokenBody getTokenBody(String token) {
 		ObjectMapper mapper = new ObjectMapper();
 		try {
 			String bodyinfo = new String(TextCodec.BASE64URL.decode(token.split("\\.")[1]),"utf-8");

@@ -24,6 +24,8 @@ public class JwtHelper {
 					.parseClaimsJws(jsonWebToken).getBody();
 			return claims;
 		}catch(Exception e){
+			Log.print(e.getMessage());
+			e.printStackTrace();
 			return null;
 		}
 	}
@@ -82,26 +84,26 @@ public class JwtHelper {
 	public static void main(String[] args) {
 		JwtHelper.init(365*24*3600);
 		String token = createJWT("zjz","0001","1","xhyjClient","xhyjServer",10*1000,"123123123");
-		System.out.println(token);
-		System.out.println(parseJWT(token,"123123123"));
+		Log.print(token);
+		Log.print(parseJWT(token,"123123123").toString());
 		
 		try {
-			System.out.println(new String(TextCodec.BASE64URL.decode(token.split("\\.")[0]),"utf-8"));
-			System.out.println(new String(TextCodec.BASE64URL.decode(token.split("\\.")[1]),"utf-8"));
-			System.out.println(new String(TextCodec.BASE64URL.decode(token),"utf-8"));
+			Log.print(new String(TextCodec.BASE64URL.decode(token.split("\\.")[0]),"utf-8"));
+			Log.print(new String(TextCodec.BASE64URL.decode(token.split("\\.")[1]),"utf-8"));
+			Log.print(new String(TextCodec.BASE64URL.decode(token),"utf-8"));
 			Thread.sleep(3*1000);
-			System.out.println(parseJWT(token,"123123123"));
+			Log.print(parseJWT(token,"123123123").toString());
 			
 			String token2 = createJWT("zjz","0002","1","xhyjClient","xhyjServer",10*1000,"123123123");
 			String token2Body=token2.split("\\.")[1];
 			String tokenHead=token.split("\\.")[0];
 			String tokenSign=token.split("\\.")[2];
 			String newToken = tokenHead+"."+token2Body+"."+tokenSign;
-			System.out.println("=================");
-			System.out.println("token:"+token);
-			System.out.println("toke2:"+newToken);
-			System.out.println("=================");
-			System.out.println("新token解析结果："+parseJWT(newToken,"123123123"));
+			Log.print("=================");
+			Log.print("token:"+token);
+			Log.print("toke2:"+newToken);
+			Log.print("=================");
+			Log.print("新token解析结果："+parseJWT(newToken,"123123123"));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
